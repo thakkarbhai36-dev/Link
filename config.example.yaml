@@ -1,0 +1,147 @@
+# linkedin-autopilot configuration.
+# Copy to config.yaml and edit. Secrets live in .env, never here.
+
+timezone: Asia/Kolkata
+
+# Global brake. While true, nothing is written to LinkedIn: every action is
+# logged and queued instead. Flip to false only once the queue looks right.
+dry_run: true
+
+# Touching this file stops all activity immediately, mid-run.
+kill_switch_file: ./state/STOP
+
+state_dir: ./state
+
+llm:
+  model: claude-opus-5
+  effort: high          # low | medium | high | xhigh | max
+  max_tokens: 8000
+  # Ask Claude to re-route instead of hard-failing if a request is declined.
+  server_side_fallbacks: true
+
+# ---------------------------------------------------------------------------
+# Daily posting — uses the official LinkedIn API. Fully supported by LinkedIn.
+# ---------------------------------------------------------------------------
+posting:
+  enabled: true
+  # Drafts are written at these local times. With require_approval: true they
+  # wait in the queue; with false they publish on the spot.
+  times: ["09:15"]
+  days: [mon, tue, wed, thu, fri]
+  require_approval: true
+  max_per_day: 1
+  visibility: PUBLIC        # PUBLIC | CONNECTIONS
+  max_chars: 2600
+
+  # Who you sound like. The generator reads this verbatim.
+  voice: |
+    Senior backend engineer, ten years in. Writes plainly, no hype, no
+    emoji walls. Prefers a concrete story or number over a general claim.
+    Never opens with "I'm thrilled to announce".
+
+  # Rotated in order, skipping anything covered in the last `topic_cooldown_days`.
+  topics:
+    - Lessons from production incidents
+    - Practical database performance
+    - Code review culture
+    - Career growth for mid-level engineers
+    - Build-vs-buy tradeoffs
+  topic_cooldown_days: 14
+
+  hashtags:
+    enabled: true
+    max: 3
+    pool: ["#softwareengineering", "#backend", "#databases", "#engineeringculture"]
+
+  # Phrases the generator must never produce. Drafts containing them are rejected
+  # and regenerated once.
+  banned_phrases:
+    - "thrilled to announce"
+    - "humbled to share"
+    - "game-changer"
+    - "in today's fast-paced world"
+    - "let that sink in"
+
+# ---------------------------------------------------------------------------
+# Engagement — likes and comments on other people's posts.
+#
+# READ THIS BEFORE ENABLING. LinkedIn's public API does not offer likes or
+# comments on other members' posts to individual developers, so this module
+# drives a real browser session. That is automated access under section 8.2 of
+# LinkedIn's User Agreement, and accounts doing it can be restricted or banned.
+# It is your account and your call. Defaults here are deliberately timid.
+# ---------------------------------------------------------------------------
+engagement:
+  enabled: false
+
+  # off     — do nothing.
+  # suggest — read the feed, draft comments, queue them for you. Never writes.
+  # auto    — perform approved action types without asking. Opt in knowingly.
+  mode: suggest
+
+  # Only act on posts from people you are actually connected to.
+  first_degree_only: true
+
+  interests:
+    - distributed systems
+    - postgres
+    - developer experience
+    - incident response
+    - api design
+
+  # A post matching any of these is skipped outright, whatever it scores.
+  exclude_keywords:
+    - hiring
+    - "promoted post"
+    - crypto
+    - giveaway
+    - "comment below to receive"
+
+  # 0.0–1.0. Posts scoring under this are ignored.
+  min_relevance: 0.55
+
+  # Ask Claude to score borderline posts instead of relying on keywords alone.
+  llm_scoring: true
+
+  likes:
+    enabled: true
+    max_per_day: 15
+    max_per_author_per_week: 3
+
+  comments:
+    enabled: true
+    max_per_day: 5
+    max_per_author_per_week: 1
+    min_chars: 120
+    max_chars: 600
+    # Comments must add something. These are rejected before they reach you.
+    reject_if_generic: true
+    no_links: true
+    no_hashtags: true
+
+  # How far back in the feed to look.
+  feed_scan_limit: 40
+  # Skip posts older than this.
+  max_post_age_hours: 48
+
+# ---------------------------------------------------------------------------
+# Pacing. These exist so the account behaves like a person, not a cron job.
+# ---------------------------------------------------------------------------
+safety:
+  # No activity outside this local window.
+  active_hours: { start: "08:00", end: "21:00" }
+  # Random pause between consecutive actions.
+  min_seconds_between_actions: 45
+  max_seconds_between_actions: 180
+  # Random offset applied to every scheduled job so it never fires on the dot.
+  schedule_jitter_seconds: 900
+  # Hard ceiling across every action type, regardless of the per-type limits.
+  max_actions_per_day: 25
+
+browser:
+  # Persistent Chromium profile. You log in by hand once; the session is reused.
+  user_data_dir: ./state/browser-profile
+  headless: false
+  # Saved when a selector breaks, so you can see what the page actually looked like.
+  screenshot_dir: ./state/screenshots
+  nav_timeout_ms: 30000

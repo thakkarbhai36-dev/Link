@@ -1,0 +1,33 @@
+# Secrets & local state — never commit these
+.env
+*.env
+!.env.example
+tokens.json
+config.yaml
+!config.example.yaml
+state/
+data/
+*.sqlite3
+*.db
+browser-profile/
+screenshots/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
