@@ -258,6 +258,62 @@ def run(config: ConfigOption = None) -> None:
 
 
 @app.command()
+def web(
+    config: ConfigOption = None,
+    host: Annotated[
+        str, typer.Option("--host", help="Interface to bind. Loopback by default.")
+    ] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port")] = 8770,
+    token: Annotated[
+        str | None,
+        typer.Option(
+            "--token",
+            envvar="AUTOPILOT_WEB_TOKEN",
+            help="Access token. Generated for a loopback bind if omitted.",
+        ),
+    ] = None,
+) -> None:
+    """Serve the review dashboard in a browser."""
+    cfg, store, guard = _bootstrap(config)
+    from .web import build_server
+
+    try:
+        server, resolved, generated = build_server(
+            cfg, store, guard, host=host, port=port, token=token
+        )
+    except AutopilotError as exc:
+        _fail(exc)
+        return
+
+    shown = host if host not in {"0.0.0.0", "::"} else "<this machine>"
+    console.print(
+        Panel(
+            f"[bold]http://{shown}:{port}/?token={resolved}[/bold]\n\n"
+            + (
+                "[dim]Token generated for this run. It changes on restart.[/dim]"
+                if generated
+                else "[dim]Using the token you supplied.[/dim]"
+            ),
+            title="Dashboard",
+        )
+    )
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        console.print(
+            "[yellow]This is reachable beyond your machine. Anyone with the token can "
+            "publish as you. Prefer an SSH tunnel to a loopback bind.[/yellow]"
+        )
+    if cfg.dry_run:
+        console.print("[dim]Dry run is on: approving publishes nothing.[/dim]")
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        console.print("\n[dim]Dashboard stopped.[/dim]")
+    finally:
+        server.server_close()
+
+
+@app.command()
 def stop(config: ConfigOption = None) -> None:
     """Engage the kill switch: halt all activity immediately."""
     cfg, _store, _guard = _bootstrap(config)

@@ -123,6 +123,55 @@ trust what the queue is producing.
 
 ---
 
+## The dashboard
+
+The CLI is not much use from a phone. `autopilot web` serves the same review
+queue as a web page.
+
+```bash
+autopilot web
+```
+
+It prints a URL carrying a token. Open it and you get the pending queue, the
+full text of each draft, an editor, approve and reject buttons, the current
+quotas, and the kill switch. It is server-rendered with no JavaScript, so it
+holds up on a bad connection.
+
+Four things worth knowing:
+
+- **It can publish as you.** Anyone who reaches it with the token can put a post
+  on your feed. Treat the URL like a password.
+- **It binds to localhost by default.** To reach it from your phone, prefer an
+  SSH tunnel over exposing the port.
+- **It refuses a public bind without a token you chose.** A generated token
+  scrolls past in a log, so `--host 0.0.0.0` requires `AUTOPILOT_WEB_TOKEN` to
+  be set explicitly.
+- **The token leaves the URL on first load**, moving into an `HttpOnly`,
+  `SameSite=Strict` cookie so it stops appearing in browser history.
+
+```bash
+# Tunnel, then open http://localhost:8770 on the phone
+ssh -L 8770:127.0.0.1:8770 you@yourbox
+
+# Or, if you really must expose it
+export AUTOPILOT_WEB_TOKEN=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')
+autopilot web --host 0.0.0.0 --port 8770
+```
+
+### Hosting it
+
+The posting half runs fine on a small always-on host, including free tiers. It
+is a scheduler and an HTTPS client, nothing more. Two caveats.
+
+The engagement half needs a real Chromium and a logged-in LinkedIn session on
+disk. Most small hosts have neither a straightforward Chromium install nor
+storage that survives a redeploy, and a datacentre IP signing in to LinkedIn is
+the pattern that triggers a security checkpoint. Run that half from a machine
+you actually use.
+
+Put `state/` on a persistent volume wherever you host it. That directory holds
+your access token and the queue, and losing it means authorizing again.
+
 ## Running it continuously
 
 ```bash
@@ -192,6 +241,7 @@ autopilot init                    write config.yaml and .env
 autopilot status                  quotas, limits, queue depth
 autopilot doctor                  check the setup is complete
 autopilot run                     start the scheduler
+autopilot web [--host] [--port]   serve the review dashboard
 autopilot stop / resume           kill switch
 
 autopilot auth login|status|logout
